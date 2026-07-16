@@ -1,3 +1,5 @@
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/RoyalHaskoningDHV/GW_grafieken_raai/HEAD?urlpath=%2Fdoc%2Ftree%2FGW_grafieken_raai.ipynb)
+
 TEKEN RAAI TOOL
 ===============
 Seppe-Schijf Geohydrologische Tool
