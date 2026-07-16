@@ -1,0 +1,8 @@
+# Getest en werkend met Python 3.12.13
+# Versienummers zijn de geïnstalleerde versies waarmee de tool is geverifieerd.
+
+jupyterlab>=4.6.1
+folium>=0.17.0
+geopandas>=1.1.3
+ipywidgets>=8.1.8
+ipython>=9.15.0
