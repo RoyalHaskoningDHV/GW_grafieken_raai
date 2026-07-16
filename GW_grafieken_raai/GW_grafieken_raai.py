@@ -1189,11 +1189,55 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
     
     // Referenties
     var drawnLine = null;
+    var drawnItems = null;
     var leafletMap = null;
     var bufferLayer = null;
     var highlightLayers = [];           // Opslaan van highlight markers
     var highlightMarkersByCardId = {{}};  // Mapping cardId → marker voor hover-highlight
     var hoveredCardId = null;           // Huidig gehighlight grafiek-card
+    
+    function getDrawnItemsGroup() {{
+        if (drawnItems && drawnItems instanceof L.FeatureGroup) {{
+            return drawnItems;
+        }}
+        if (typeof window.drawnItems !== 'undefined' && window.drawnItems instanceof L.FeatureGroup) {{
+            drawnItems = window.drawnItems;
+            return drawnItems;
+        }}
+        if (leafletMap) {{
+            leafletMap.eachLayer(function(layer) {{
+                if (!(layer instanceof L.FeatureGroup)) {{
+                    return;
+                }}
+                var children = layer.getLayers ? layer.getLayers() : [];
+                if (!children || children.length === 0) {{
+                    return;
+                }}
+                var hasDrawnShape = children.some(function(child) {{
+                    return child instanceof L.Polyline || child instanceof L.Polygon;
+                }});
+                if (hasDrawnShape) {{
+                    drawnItems = layer;
+                }}
+            }});
+            return drawnItems;
+        }}
+        return null;
+    }}
+
+    function clearDrawnItems() {{
+        var group = getDrawnItemsGroup();
+        if (group) {{
+            group.clearLayers();
+        }}
+    }}
+
+    function removeDrawnLayer(layer) {{
+        var group = getDrawnItemsGroup();
+        if (group) {{
+            group.removeLayer(layer);
+        }}
+    }}
     var lastPointsInBuffer = null;      // Laatste zoekopdracht voor auto-refresh (ongefilterd)
     var currentLine = null;             // Referentie naar de Turf.js lijn voor afstandsberekening
     var colorLayer = null;              // Dynamische gekleurde bollenkaart per modellaag
@@ -1284,7 +1328,7 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
     function filterPointsByLayer(points, modelLayer) {{
         return points.filter(function(feature) {{
             var ml = feature.properties.Modellaag;
-            if (ml === undefined || ml === null) return true;
+            if (ml === undefined || ml === null) return false;
             return parseInt(ml) === modelLayer;
         }});
     }}
@@ -1364,8 +1408,8 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
             // Luister naar draw:created event
             leafletMap.on('draw:created', function(e) {{
                 // Verwijder oude lijn als die bestaat
-                if (drawnLine && typeof drawnItems !== 'undefined') {{
-                    drawnItems.removeLayer(drawnLine);
+                if (drawnLine) {{
+                    removeDrawnLayer(drawnLine);
                 }}
                 // Verwijder ook oude buffer en highlights
                 clearHighlights();
@@ -1445,8 +1489,14 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
                 updateAllMarkerColors(modelLayer);
                 if (lastPointsInBuffer && lastPointsInBuffer.length > 0) {{
                     var filtered = filterPointsByLayer(lastPointsInBuffer, modelLayer);
-                    highlightPoints(filtered);
-                    displayGraphs(filtered, modelLayer);
+                    if (filtered.length === 0) {{
+                        clearHighlights();
+                        closePanels();
+                        showStatus('Geen peilbuizen binnen de buffer voor modellaag ' + modelLayer + '.', 'warning');
+                    }} else {{
+                        highlightPoints(filtered);
+                        displayGraphs(filtered, modelLayer);
+                    }}
                 }}
             }});
         }}
@@ -1672,18 +1722,21 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
             }});
         }}
         
-        if (coords.length === 0 && typeof drawnItems !== 'undefined') {{
-            drawnItems.eachLayer(function(layer) {{
-                if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {{
-                    var latLngs = layer.getLatLngs();
-                    if (latLngs.length > 0 && Array.isArray(latLngs[0])) {{
-                        latLngs = latLngs[0];
+        if (coords.length === 0) {{
+            var group = getDrawnItemsGroup();
+            if (group) {{
+                group.eachLayer(function(layer) {{
+                    if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {{
+                        var latLngs = layer.getLatLngs();
+                        if (latLngs.length > 0 && Array.isArray(latLngs[0])) {{
+                            latLngs = latLngs[0];
+                        }}
+                        latLngs.forEach(function(ll) {{
+                            coords.push([ll.lng, ll.lat]);
+                        }});
                     }}
-                    latLngs.forEach(function(ll) {{
-                        coords.push([ll.lng, ll.lat]);
-                    }});
-                }}
-            }});
+                }});
+            }}
         }}
         
         return coords.length >= 2 ? coords : null;
@@ -1928,9 +1981,7 @@ def _get_ui_tweaks_html() -> str:
             deleteBtn.addEventListener('click', function(e) {
                 e.stopImmediatePropagation();
                 e.preventDefault();
-                if (typeof drawnItems !== 'undefined') {
-                    drawnItems.clearLayers();
-                }
+                clearDrawnItems();
                 drawnLine = null;
                 clearHighlights();
                 if (bufferLayer && leafletMap) {
@@ -2045,9 +2096,18 @@ def create_raai_selection_map(
         print("Waarschuwing: Geen afbeeldingen gevonden in de opgegeven modellagen!")
         available_layers = model_layers
     
-    bounds = primary_points.total_bounds
-    center_lat = (bounds[1] + bounds[3]) / 2
-    center_lon = (bounds[0] + bounds[2]) / 2
+    # Bepaal kaartcentrum op basis van alle beschikbare datasets (niet alleen de eerste gevonden)
+    all_bounds = [g.total_bounds for g in _loaded.values() if g is not None]
+    if all_bounds:
+        minx = min(b[0] for b in all_bounds)
+        miny = min(b[1] for b in all_bounds)
+        maxx = max(b[2] for b in all_bounds)
+        maxy = max(b[3] for b in all_bounds)
+    else:
+        bounds = primary_points.total_bounds
+        minx, miny, maxx, maxy = bounds[0], bounds[1], bounds[2], bounds[3]
+    center_lat = (miny + maxy) / 2
+    center_lon = (minx + maxx) / 2
     
     fmap = folium.Map(
         location=[center_lat, center_lon],
@@ -2082,25 +2142,9 @@ def create_raai_selection_map(
             tooltip_fields=_pick_tooltip_fields(gdf),
         ).add_to(fmap)
 
-    # Voeg peilbuispunten toe (op basis van eerste beschikbare dataset)
+# Voeg een lege Peilbuizen-laag toe voor de Leaflet layer control.
+    # De daadwerkelijke puntenkleur wordt in de browser dynamisch geladen per dataset.
     fg = folium.FeatureGroup(name="Peilbuizen", show=True)
-
-    for _, row in primary_points.iterrows():
-        geom = row.geometry
-        if geom is None:
-            continue
-        
-        color = "#888888"  # Grijs; dynamisch ingekleurd per modellaag via JavaScript
-           
-        folium.CircleMarker(
-            location=[geom.y, geom.x],
-            radius=5,
-            color=color,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.8,
-        ).add_to(fg)
-    
     fg.add_to(fmap)
     
     # Voeg Draw plugin toe
@@ -2584,7 +2628,17 @@ def run_tool(base_dir):
     def _on_open(_):
         if state["kaart_path"] is None:
             return
-        webbrowser.open(state["kaart_path"].resolve().as_uri())
+        try:
+            rel_path = state["kaart_path"].relative_to(base_dir)
+            rel_url = f"files/{rel_path.as_posix()}"
+        except ValueError:
+            rel_url = None
+
+        from IPython.display import Javascript
+        if rel_url is not None:
+            display(Javascript(f"window.open({json.dumps(rel_url)}, '_blank');"))
+        else:
+            webbrowser.open(state["kaart_path"].resolve().as_uri())
 
     generate_btn.on_click(_on_generate)
     open_btn.on_click(_on_open)
