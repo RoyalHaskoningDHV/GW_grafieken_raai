@@ -57,6 +57,14 @@ De tool bestaat uit:
    van de grafieken), instellingen en knoppen.
 3) Controleer/pas de bestandspaden aan (shapefile peilbuizen, map met grafieken,
    HTML-exportpad) en de lijst met achtergrondlagen indien gewenst.
+4) Als je de notebook wilt bewaren zonder de opgeslagen uitvoer, wis dan eerst
+   alle outputs en sla opnieuw op. Je kunt dit handmatig doen in Jupyter of
+   met het hulpscript:
+       python clean_notebook_outputs.py GW_grafieken_raai.ipynb
+5) Klik op "Genereer kaart". De beschikbare modellagen worden automatisch herkend
+   aan de genummerde submappen in de grafieken-map; de kaart wordt gegenereerd en
+   direct opgeslagen als HTML-bestand op het opgegeven pad (standaard:
+   output/Teken_raaitool.html).
 4) Klik op "Genereer kaart". De beschikbare modellagen worden automatisch herkend
    aan de genummerde submappen in de grafieken-map; de kaart wordt gegenereerd en
    direct opgeslagen als HTML-bestand op het opgegeven pad (standaard:
@@ -103,6 +111,6 @@ output/
 6. CONTACT
 -----------
 Voor bugs, feedback of vragen:
-- https://github.com/......
+- https://github.com/RoyalHaskoningDHV/GW_grafieken_raai
 
 
