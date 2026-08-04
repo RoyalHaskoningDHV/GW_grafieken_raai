@@ -57,23 +57,19 @@ De tool bestaat uit:
    van de grafieken), instellingen en knoppen.
 3) Controleer/pas de bestandspaden aan (shapefile peilbuizen, map met grafieken,
    HTML-exportpad) en de lijst met achtergrondlagen indien gewenst.
-4) Als je de notebook wilt bewaren zonder de opgeslagen uitvoer, wis dan eerst
-   alle outputs en sla opnieuw op. Je kunt dit handmatig doen in Jupyter of
-   met het hulpscript:
-       python clean_notebook_outputs.py GW_grafieken_raai.ipynb
-5) Klik op "Genereer kaart". De beschikbare modellagen worden automatisch herkend
-   aan de genummerde submappen in de grafieken-map; de kaart wordt gegenereerd en
-   direct opgeslagen als HTML-bestand op het opgegeven pad (standaard:
-   output/Teken_raaitool.html).
 4) Klik op "Genereer kaart". De beschikbare modellagen worden automatisch herkend
    aan de genummerde submappen in de grafieken-map; de kaart wordt gegenereerd en
    direct opgeslagen als HTML-bestand op het opgegeven pad (standaard:
    output/Teken_raaitool.html).
-5) Klik op "Open kaart" om het zojuist opgeslagen HTML-bestand in een nieuw
+5) Klik op "Genereer kaart". De beschikbare modellagen worden automatisch herkend
+   aan de genummerde submappen in de grafieken-map; de kaart wordt gegenereerd en
+   direct opgeslagen als HTML-bestand op het opgegeven pad (standaard:
+   output/Teken_raaitool.html).
+6) Klik op "Open kaart" om het zojuist opgeslagen HTML-bestand in een nieuw
    browsertabblad te openen.
-6) Teken op de kaart een raai (lijn), kies een bufferzone en klik op
+7) Teken op de kaart een raai (lijn), kies een bufferzone en klik op
    "Zoek Punten" om de peilbuizen en bijbehorende grafieken te tonen.
-7) Pas je iets aan (bestandspaden, achtergrondlagen)? Klik opnieuw op "Genereer
+8) Pas je iets aan (bestandspaden, achtergrondlagen)? Klik opnieuw op "Genereer
    kaart" en daarna op "Open kaart" om de bijgewerkte versie te bekijken.
 
 
