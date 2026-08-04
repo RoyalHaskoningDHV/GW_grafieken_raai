@@ -61,11 +61,15 @@ De tool bestaat uit:
    aan de genummerde submappen in de grafieken-map; de kaart wordt gegenereerd en
    direct opgeslagen als HTML-bestand op het opgegeven pad (standaard:
    output/Teken_raaitool.html).
-5) Klik op "Open kaart" om het zojuist opgeslagen HTML-bestand in een nieuw
+5) Klik op "Genereer kaart". De beschikbare modellagen worden automatisch herkend
+   aan de genummerde submappen in de grafieken-map; de kaart wordt gegenereerd en
+   direct opgeslagen als HTML-bestand op het opgegeven pad (standaard:
+   output/Teken_raaitool.html).
+6) Klik op "Open kaart" om het zojuist opgeslagen HTML-bestand in een nieuw
    browsertabblad te openen.
-6) Teken op de kaart een raai (lijn), kies een bufferzone en klik op
+7) Teken op de kaart een raai (lijn), kies een bufferzone en klik op
    "Zoek Punten" om de peilbuizen en bijbehorende grafieken te tonen.
-7) Pas je iets aan (bestandspaden, achtergrondlagen)? Klik opnieuw op "Genereer
+8) Pas je iets aan (bestandspaden, achtergrondlagen)? Klik opnieuw op "Genereer
    kaart" en daarna op "Open kaart" om de bijgewerkte versie te bekijken.
 
 
@@ -87,22 +91,22 @@ mappenstructuur van de grafieken staat inklapbaar in de notebook zelf (onder
 5. PROJECTSTRUCTUUR
 ---------------------
 04_Tool_Concept/
-|-- Jupyter_setup.ipynb        - notebook, start hier
-|-- Teken_raai_tool.py         - module met alle kaart-/rekencode en UI
-|-- requirements.txt           - benodigde Python-packages
-|-- haskoning_branding_1.md    - Haskoning huisstijl-referentie
-|-- img/haskoning-logo.svg     - logo, gebruikt in de kaart en notebook-header
-|-- input/
-|   |-- 00_achtergrond_shp/    - optionele achtergrondlagen (provincies, waterlopen, onttrekkingen)
-|   |-- 01_bollenkaart_shp/    - shapefile met peilbuisgegevens
-|   `-- 02_grafieken_png/<modellaag>/ - grafieken per modellaag
-`-- output/
-    `-- Teken_raaitool.html    - ge\u00ebxporteerde interactieve kaart (via de exportknop)
+Jupyter_setup.ipynb        - notebook, start hier
+Teken_raai_tool.py         - module met alle kaart-/rekencode en UI
+requirements.txt           - benodigde Python-packages
+haskoning_branding_1.md    - Haskoning huisstijl-referentie
+img/haskoning-logo.svg     - logo, gebruikt in de kaart en notebook-header
+input/
+   00_achtergrond_shp/    - optionele achtergrondlagen (provincies, waterlopen, onttrekkingen)
+   01_bollenkaart_shp/    - shapefile met peilbuisgegevens
+   02_grafieken_png/<modellaag>/ - grafieken per modellaag
+output/
+   Teken_raaitool.html    - ge\u00ebxporteerde interactieve kaart (via de exportknop)
 
 
 6. CONTACT
 -----------
 Voor bugs, feedback of vragen:
-- https://github.com/......
+- https://github.com/RoyalHaskoningDHV/GW_grafieken_raai
 
 
