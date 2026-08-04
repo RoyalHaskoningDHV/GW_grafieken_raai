@@ -90,23 +90,25 @@ mappenstructuur van de grafieken staat inklapbaar in de notebook zelf (onder
 
 5. PROJECTSTRUCTUUR
 ---------------------
-04_Tool_Concept/
-Jupyter_setup.ipynb        - notebook, start hier
-Teken_raai_tool.py         - module met alle kaart-/rekencode en UI
-requirements.txt           - benodigde Python-packages
-haskoning_branding_1.md    - Haskoning huisstijl-referentie
-img/haskoning-logo.svg     - logo, gebruikt in de kaart en notebook-header
-input/
-   00_achtergrond_shp/    - optionele achtergrondlagen (provincies, waterlopen, onttrekkingen)
-   01_bollenkaart_shp/    - shapefile met peilbuisgegevens
-   02_grafieken_png/<modellaag>/ - grafieken per modellaag
-output/
-   Teken_raaitool.html    - ge\u00ebxporteerde interactieve kaart (via de exportknop)
+- 04_Tool_Concept/
+-     Jupyter_setup.ipynb        - notebook, start hier
+-     Teken_raai_tool.py         - module met alle kaart-/rekencode en UI
+-     requirements.txt           - benodigde Python-packages
+-     haskoning_branding_1.md    - Haskoning huisstijl-referentie
+-     img/haskoning-logo.svg     - logo, gebruikt in de kaart en notebook-header
+-     input/
+-        00_achtergrond_shp/    - optionele achtergrondlagen (provincies, waterlopen, onttrekkingen)
+-        01_bollenkaart_shp/    - shapefile met peilbuisgegevens
+-        02_grafieken_png/<modellaag>/ - grafieken per modellaag
+-     output/
+-        Teken_raaitool.html    - ge\u00ebxporteerde interactieve kaart (via de exportknop)
 
 
 6. CONTACT
 -----------
 Voor bugs, feedback of vragen:
-- https://github.com/RoyalHaskoningDHV/GW_grafieken_raai
+- https://github.com/didierhaagmans
+- https://github.com/jeroenwinkelhorst
+
 
 
