@@ -2584,7 +2584,18 @@ def run_tool(base_dir):
     def _on_open(_):
         if state["kaart_path"] is None:
             return
-        webbrowser.open(state["kaart_path"].resolve().as_uri())
+        import os
+        # In Binder/JupyterHub webbrowser.open() runs server-side and never reaches the user's browser.
+        _hub_prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "")
+        if os.environ.get("BINDER_SERVICE_HOST") or _hub_prefix:
+            rel = os.path.relpath(
+                str(state["kaart_path"].resolve()), os.getcwd()
+            ).replace(os.sep, "/")
+            url = (_hub_prefix.rstrip("/") + "/files/" + rel) if _hub_prefix else "/files/" + rel
+            from IPython.display import display as _d, Javascript as _JS
+            _d(_JS(f'window.open("{url}", "_blank")'))
+        else:
+            webbrowser.open(state["kaart_path"].resolve().as_uri())
 
     generate_btn.on_click(_on_generate)
     open_btn.on_click(_on_open)

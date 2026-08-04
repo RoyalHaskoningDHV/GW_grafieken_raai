@@ -1,4 +1,4 @@
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/RoyalHaskoningDHV/GW_grafieken_raai/HEAD?urlpath=%2Fdoc%2Ftree%2FGW_grafieken_raai.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/RoyalHaskoningDHV/GW_grafieken_raai/HEAD?urlpath=%2Fdoc%2Ftree%2FJupyter_setup.ipynb)
 
 TEKEN RAAI TOOL
 ===============
@@ -10,7 +10,7 @@ bijbehorende grafieken per modellaag.
 
 De tool bestaat uit:
 - Jupyter Notebook gebruikersinterface (Jupyter_setup.ipynb)
-- Python-module met de kaart-/rekencode (Teken_raai_tool.py)
+- Python-module met de kaart-/rekencode (GW_grafieken_raai/GW_grafieken_raai.py)
 - Shapefile met peilbuisgegevens (input/01_bollenkaart_shp)
 - Grafieken van metingen en modelresultaten, per modellaag (input/02_grafieken_png)
 - Optionele achtergrond-shapefiles (input/00_achtergrond_shp)
@@ -52,7 +52,7 @@ De tool bestaat uit:
 3. GEBRUIK
 -----------
 1) Open Jupyter_setup.ipynb in Jupyter Lab.
-2) Run de ene code-cel. Dit laadt de volledige tool: Haskoning-huisstijl, een
+2) Run de ene code-cel. Dit laadt de volledige tool: In de Haskoning-huisstijl, een
    korte uitleg, inklapbare detail-uitleg (shapefile-opbouw en mappenstructuur
    van de grafieken), instellingen en knoppen.
 3) Controleer/pas de bestandspaden aan (shapefile peilbuizen, map met grafieken,
@@ -90,19 +90,20 @@ mappenstructuur van de grafieken staat inklapbaar in de notebook zelf (onder
 
 5. PROJECTSTRUCTUUR
 ---------------------
-- 04_Tool_Concept/
--     Jupyter_setup.ipynb        - notebook, start hier
--     Teken_raai_tool.py         - module met alle kaart-/rekencode en UI
--     requirements.txt           - benodigde Python-packages
+- Jupyter_setup.ipynb                        - notebook, start hier
+- requirements.txt                           - benodigde Python-packages
+- runtime.txt                                - runtime-instelling voor Binder
+- GW_grafieken_raai/GW_grafieken_raai.py     - Python-package met kaart-/rekencode en UI
+- input/
+-     00_achtergrond_shp/                    - optionele achtergrondlagen
+-     01_bollenkaart_shp/                    - shapefiles met peilbuisgegevens
+-     02_grafieken_png/<modellaag>/          - grafieken per modellaag
+- output/
+-     Teken_raaitool.html                    - geëxporteerde interactieve kaart
+
+Standaard Layout Haskoning
 -     haskoning_branding_1.md    - Haskoning huisstijl-referentie
 -     img/haskoning-logo.svg     - logo, gebruikt in de kaart en notebook-header
--     input/
--        00_achtergrond_shp/    - optionele achtergrondlagen (provincies, waterlopen, onttrekkingen)
--        01_bollenkaart_shp/    - shapefile met peilbuisgegevens
--        02_grafieken_png/<modellaag>/ - grafieken per modellaag
--     output/
--        Teken_raaitool.html    - ge\u00ebxporteerde interactieve kaart (via de exportknop)
-
 
 6. CONTACT
 -----------
