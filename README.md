@@ -94,16 +94,14 @@ mappenstructuur van de grafieken staat inklapbaar in de notebook zelf (onder
 - requirements.txt                           - benodigde Python-packages
 - runtime.txt                                - runtime-instelling voor Binder
 - GW_grafieken_raai/GW_grafieken_raai.py     - Python-package met kaart-/rekencode en UI
-- input/
--     00_achtergrond_shp/                    - optionele achtergrondlagen
--     01_bollenkaart_shp/                    - shapefiles met peilbuisgegevens
--     02_grafieken_png/<modellaag>/          - grafieken per modellaag
-- output/
--     Teken_raaitool.html                    - geëxporteerde interactieve kaart
+- input/00_achtergrond_shp/                  - optionele achtergrondlagen
+- input/01_bollenkaart_shp/                  - shapefiles met peilbuisgegevens
+- input/02_grafieken_png/<modellaag>/        - grafieken per modellaag
+- output/Teken_raaitool.html                 - geëxporteerde interactieve kaart
 
 Standaard Layout Haskoning
--     haskoning_branding_1.md    - Haskoning huisstijl-referentie
--     img/haskoning-logo.svg     - logo, gebruikt in de kaart en notebook-header
+- haskoning_branding_1.md                    - Haskoning huisstijl-referentie
+- img/haskoning-logo.svg                     - logo, gebruikt in de kaart en notebook-header
 
 6. CONTACT
 -----------
