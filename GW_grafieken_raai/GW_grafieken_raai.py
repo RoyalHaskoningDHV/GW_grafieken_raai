@@ -2186,12 +2186,15 @@ def setup_widgets(base_dir):
 
     def _browse_to(widget, mode, **kw):
         def _handler(_):
-            r = tk.Tk(); r.withdraw(); r.attributes("-topmost", True)
-            fn = {"file": filedialog.askopenfilename,
-                  "dir":  filedialog.askdirectory,
-                  "save": filedialog.asksaveasfilename}[mode]
-            p = fn(**kw); r.destroy()
-            if p: widget.value = p
+            try:
+                r = tk.Tk(); r.withdraw(); r.attributes("-topmost", True)
+                fn = {"file": filedialog.askopenfilename,
+                      "dir":  filedialog.askdirectory,
+                      "save": filedialog.asksaveasfilename}[mode]
+                p = fn(**kw); r.destroy()
+                if p: widget.value = p
+            except Exception:
+                pass  # Geen GUI beschikbaar (bijv. Binder/JupyterHub)
         return _handler
 
     # Alle pad-velden delen dezelfde breedte, label-breedte en (via de hsk-input class) dezelfde
@@ -2260,16 +2263,19 @@ def setup_widgets(base_dir):
         row_dict = {"path_w": path_w, "name_w": name_w}
 
         def _browse_layer(_):
-            r = tk.Tk(); r.withdraw(); r.attributes("-topmost", True)
-            p = filedialog.askopenfilename(
-                title="Selecteer achtergrond shapefile",
-                filetypes=[("Shapefile", "*.shp")],
-                initialdir=str(base_dir / "input"))
-            r.destroy()
-            if p:
-                path_w.value = p
-                if not name_w.value:
-                    name_w.value = Path(p).stem
+            try:
+                r = tk.Tk(); r.withdraw(); r.attributes("-topmost", True)
+                p = filedialog.askopenfilename(
+                    title="Selecteer achtergrond shapefile",
+                    filetypes=[("Shapefile", "*.shp")],
+                    initialdir=str(base_dir / "input"))
+                r.destroy()
+                if p:
+                    path_w.value = p
+                    if not name_w.value:
+                        name_w.value = Path(p).stem
+            except Exception:
+                pass  # Geen GUI beschikbaar (bijv. Binder/JupyterHub)
 
         browse_btn.on_click(_browse_layer)
         remove_btn.on_click(_remove(row_dict))
@@ -2292,14 +2298,17 @@ def setup_widgets(base_dir):
     add_btn.add_class("hsk-btn-secondary")
 
     def _add_new(_):
-        r = tk.Tk(); r.withdraw(); r.attributes("-topmost", True)
-        p = filedialog.askopenfilename(
-            title="Selecteer achtergrond shapefile",
-            filetypes=[("Shapefile", "*.shp")],
-            initialdir=str(base_dir / "input"))
-        r.destroy()
-        if p:
-            _add_layer(path=p, name=Path(p).stem)
+        try:
+            r = tk.Tk(); r.withdraw(); r.attributes("-topmost", True)
+            p = filedialog.askopenfilename(
+                title="Selecteer achtergrond shapefile",
+                filetypes=[("Shapefile", "*.shp")],
+                initialdir=str(base_dir / "input"))
+            r.destroy()
+            if p:
+                _add_layer(path=p, name=Path(p).stem)
+        except Exception:
+            pass  # Geen GUI beschikbaar (bijv. Binder/JupyterHub)
 
     add_btn.on_click(_add_new)
 
@@ -2596,15 +2605,20 @@ def run_tool(base_dir):
                 str(state["kaart_path"].resolve()), os.getcwd()
             ).replace(os.sep, "/")
             url = (_hub_prefix.rstrip("/") + "/files/" + rel) if _hub_prefix else "/files/" + rel
-            # Toon een klikbare link; window.open() wordt vaak geblokkeerd door de browser.
-            _d(_HTML(
-                f'<a href="{url}" target="_blank" style="display:inline-block;margin-top:6px;'
-                f'padding:8px 16px;background-color:{THEME_GREEN["secondary"]};color:white;'
-                f'border-radius:4px;text-decoration:none;font-family:Arial,sans-serif;'
-                f'font-weight:600;font-size:13px;">🌐 Klik hier om de kaart te openen</a>'
-            ))
-            from IPython.display import Javascript as _JS
-            _d(_JS(f'window.open("{url}", "_blank")'))
+            from IPython.display import Javascript as _JS, IFrame as _IFrame
+            # Anchor-klik wordt niet als popup geblokkeerd; IFrame toont de kaart inline.
+            _d(_JS(f'''
+(function() {{
+    var a = document.createElement('a');
+    a.href = "{url}";
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() {{ document.body.removeChild(a); }}, 100);
+}})();
+'''))
+            _d(_IFrame(url, width='100%', height='720px'))
         else:
             webbrowser.open(state["kaart_path"].resolve().as_uri())
 
