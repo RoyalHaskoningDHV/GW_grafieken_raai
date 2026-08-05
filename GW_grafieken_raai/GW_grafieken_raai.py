@@ -1928,6 +1928,10 @@ def _get_ui_tweaks_html() -> str:
             deleteBtn.addEventListener('click', function(e) {
                 e.stopImmediatePropagation();
                 e.preventDefault();
+                // drawnItems.clearLayers() werkt niet altijd; expliciet verwijderen als fallback.
+                if (drawnLine && leafletMap) {
+                    leafletMap.removeLayer(drawnLine);
+                }
                 if (typeof drawnItems !== 'undefined') {
                     drawnItems.clearLayers();
                 }
