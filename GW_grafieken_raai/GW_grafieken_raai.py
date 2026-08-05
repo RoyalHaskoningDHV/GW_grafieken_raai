@@ -2585,14 +2585,21 @@ def run_tool(base_dir):
         if state["kaart_path"] is None:
             return
         import os
-        # In Binder/JupyterHub webbrowser.open() runs server-side and never reaches the user's browser.
+        from IPython.display import display as _d, HTML as _HTML
         _hub_prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "")
         if os.environ.get("BINDER_SERVICE_HOST") or _hub_prefix:
             rel = os.path.relpath(
                 str(state["kaart_path"].resolve()), os.getcwd()
             ).replace(os.sep, "/")
             url = (_hub_prefix.rstrip("/") + "/files/" + rel) if _hub_prefix else "/files/" + rel
-            from IPython.display import display as _d, Javascript as _JS
+            # Toon een klikbare link; window.open() wordt vaak geblokkeerd door de browser.
+            _d(_HTML(
+                f'<a href="{url}" target="_blank" style="display:inline-block;margin-top:6px;'
+                f'padding:8px 16px;background-color:{THEME_GREEN["secondary"]};color:white;'
+                f'border-radius:4px;text-decoration:none;font-family:Arial,sans-serif;'
+                f'font-weight:600;font-size:13px;">🌐 Klik hier om de kaart te openen</a>'
+            ))
+            from IPython.display import Javascript as _JS
             _d(_JS(f'window.open("{url}", "_blank")'))
         else:
             webbrowser.open(state["kaart_path"].resolve().as_uri())
