@@ -11,9 +11,9 @@ bijbehorende grafieken per modellaag.
 De tool bestaat uit:
 - Jupyter Notebook gebruikersinterface (Jupyter_setup.ipynb)
 - Python-module met de kaart-/rekencode (GW_grafieken_raai/GW_grafieken_raai.py)
+- Optionele achtergrond-shapefiles (input/00_achtergrond_shp)
 - Shapefile met peilbuisgegevens (input/01_bollenkaart_shp)
 - Grafieken van metingen en modelresultaten, per modellaag (input/02_grafieken_png)
-- Optionele achtergrond-shapefiles (input/00_achtergrond_shp)
 - Interactieve kaart met kaartlagen, raai-tekentool en export naar HTML
 
 
@@ -31,7 +31,6 @@ De tool bestaat uit:
     geopandas    - shapefiles inlezen en verwerken
     matplotlib   - ondersteunende functionaliteit voor ruimtelijke eenheden
     ipywidgets   - knoppen, tekstvelden en instellingen-UI in de notebook
-
 
 2. INSTALLATIE
 ---------------
@@ -82,6 +81,14 @@ mappenstructuur van de grafieken staat inklapbaar in de notebook zelf (onder
 - De grafieken staan per modellaag in een genummerde submap
   (input/02_grafieken_png/<modellaag>/), met bestandsnamen die exact overeenkomen
   met de kolom Naam (eventueel met filternummer, bijv. B43H0316_2.png).
+
+Let op: interpretatie van de bollenkaart:
+         De bollenkaart toont per peilbuis de kleur die hoort bij de hoogst geselecteerde
+         modellaag. Bij het gelijktijdig selecteren van meerdere lagen (bijv. laag 1, 8 en 14)
+         wordt voor een punt dat in al deze lagen voorkomt uitsluitend de kleur van de
+         hoogste laag getoond (in dit geval laag 14). Dit kan leiden tot een onjuiste
+         interpretatie. Selecteer daarom altijd slechts één modellaag tegelijk voor een
+         correcte analyse van de bollenkaart.
 
 
 5. PROJECTSTRUCTUUR
