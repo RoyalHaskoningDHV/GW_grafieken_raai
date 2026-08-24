@@ -110,7 +110,6 @@ Standaard Layout Haskoning
 -----------
 Voor bugs, feedback of vragen:
 - https://github.com/didierhaagmans
-- https://github.com/jeroenwinkelhorst
 
 
 
