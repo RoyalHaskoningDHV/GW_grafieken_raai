@@ -509,16 +509,16 @@ def _to_map_crs(gdf):
     return gdf.to_crs(MAP_CRS)
 
 
-def _layer_to_geojson(gdf, name, style=None, tooltip_fields=None):
+def _layer_to_geojson(gdf, name, style=None, popup_fields=None):
     """Converteer GeoDataFrame naar Folium GeoJson laag."""
-    tooltip = None
-    if tooltip_fields:
-        tooltip = folium.GeoJsonTooltip(fields=tooltip_fields)
+    popup = None
+    if popup_fields:
+        popup = folium.GeoJsonPopup(fields=popup_fields)
     return folium.GeoJson(
         data=gdf.__geo_interface__,
         name=name,
         style_function=(lambda _: style) if style else None,
-        tooltip=tooltip,
+        popup=popup,
     )
 
 
@@ -868,7 +868,12 @@ def _get_control_panel_html(available_layers: List[int], available_types: List[D
     - Zoek knop
     - Inklapbaar en versleepbaar
     """
-    layer_options = "\n".join([f'<option value="{l}">{l}</option>' for l in available_layers])
+    layer_checkboxes = "\n".join([
+        f'<label id="layer-label-{l}" style="display:flex;align-items:center;gap:5px;font-size:12px;padding:2px 0;cursor:pointer;">'
+        f'<input type="checkbox" class="layer-checkbox" value="{l}" {"checked" if i == 0 else ""}>'
+        f'<span>{l}</span></label>'
+        for i, l in enumerate(available_layers)
+    ])
 
     if available_types is None:
         available_types = [{'key': 'stat', 'label': 'Stat', 'enabled': True}]
@@ -920,6 +925,8 @@ def _get_control_panel_html(available_layers: List[int], available_types: List[D
         #control-panel-body {{
             padding: 15px;
             display: block;
+            max-height: 80vh;
+            overflow-y: auto;
         }}
         #control-panel-body.collapsed {{
             display: none;
@@ -987,12 +994,26 @@ def _get_control_panel_html(available_layers: List[int], available_types: List[D
                 </div>
             </div>
             <div style="margin-bottom: 10px;">
-                <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;">
-                    Modellaag:
-                </label>
-                <select id="model-layer-select" style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 3px; background-color: {HASKONING_COLORS["input_bg"]};">
-                    {layer_options}
-                </select>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label style="font-size: 12px; font-weight: 600;">Modellagen:</label>
+                    <div style="display: flex; gap: 4px;">
+                        <button onclick="selectAllLayers()" style="font-size: 10px; padding: 2px 6px; border: 1px solid {HASKONING_COLORS["primary"]}; background: white; color: {HASKONING_COLORS["primary"]}; border-radius: 3px; cursor: pointer;">Alles</button>
+                        <button onclick="deselectAllLayers()" style="font-size: 10px; padding: 2px 6px; border: 1px solid {HASKONING_COLORS["primary"]}; background: white; color: {HASKONING_COLORS["primary"]}; border-radius: 3px; cursor: pointer;">Geen</button>
+                    </div>
+                </div>
+                <div id="layer-checkbox-list" style="max-height: 120px; overflow-y: auto; border: 1px solid #ccc; border-radius: 3px; padding: 4px 6px; background-color: {HASKONING_COLORS["input_bg"]};">
+                    {layer_checkboxes}
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 3px;">Pakketgroepen:</label>
+                <div style="font-size: 11px; color: #888; margin-bottom: 5px;">Vink lagen aan → geef naam → Sla op</div>
+                <div id="packet-groups-container" style="margin-bottom: 6px; min-height: 22px;"></div>
+                <div style="display: flex; gap: 3px; align-items: center;">
+                    <input id="group-name-input" type="text" placeholder="Groepsnaam" onkeydown="if(event.key==='Enter') addPacketGroup()" style="flex:1;min-width:0;padding:4px 5px;font-size:11px;border:1px solid #ccc;border-radius:3px;background-color:{HASKONING_COLORS["input_bg"]};">
+                    <button onclick="addPacketGroup()" title="Sla huidige laagkeuze op als groep" style="padding:4px 7px;font-size:11px;font-weight:600;border:1px solid {HASKONING_COLORS["primary"]};background:white;color:{HASKONING_COLORS["primary"]};border-radius:3px;cursor:pointer;flex-shrink:0;white-space:nowrap;">Sla op</button>
+                </div>
             </div>
             
             <div style="margin-bottom: 10px;">
@@ -1028,7 +1049,7 @@ def _get_control_panel_html(available_layers: List[int], available_types: List[D
             <div style="margin-top: 12px; font-size: 13px; color: #666; border-top: 1px solid #ddd; padding-top: 8px;">
                 <b>Instructies:</b><br>
                 1. Selecteer dataset<br>
-                2. Selecteer modellaag<br>
+                2. Selecteer modellaag(en)<br>
                 3. Teken een lijn (raai) op de kaart<br>
                 &nbsp;&nbsp;&nbsp;• Klik = knikpunt<br>
                 &nbsp;&nbsp;&nbsp;• Dubbelklik = einde<br>
@@ -1091,6 +1112,68 @@ def _get_control_panel_html(available_layers: List[int], available_types: List[D
     }})();
     </script>
     '''
+
+#==========================
+# openGraphWindowForPeilbuis: opent direct een nieuw venster met laag-dropdown en grafiek
+#==========================
+
+def _get_floating_popup_html() -> str:
+    """Genereert openGraphWindowForPeilbuis: direct een venster met dropdown en grafiek."""
+    return f'''
+    <script>
+    // Opent direct een volledig venster met laag-dropdown en grafiek — slaat de floating popup over
+    function openGraphWindowForPeilbuis(naam) {{
+        var layers = [];
+        Object.keys(allImages).forEach(function(layer) {{
+            var imgs = allImages[layer];
+            var m = Object.keys(imgs).filter(function(fn) {{
+                return fn === naam || fn.indexOf(naam + '_') === 0;
+            }}).sort();
+            if (m.length) layers.push({{ l: parseInt(layer), files: m }});
+        }});
+        layers.sort(function(a, b) {{ return a.l - b.l; }});
+
+        var opts = '', imgData = {{}};
+        layers.forEach(function(info) {{
+            info.files.forEach(function(fn) {{
+                var k = info.l + '|' + fn;
+                opts += '<option value="' + k + '">Laag ' + info.l
+                    + (info.files.length > 1 ? ' \u2014 ' + fn : '') + '</option>';
+                imgData[k] = allImages[info.l][fn];
+            }});
+        }});
+
+        var hasGraphs = layers.length > 0;
+        var dataJson = JSON.stringify(imgData);
+        var html = '<!DOCTYPE html><html><head><title>' + naam + '</title>'
+            + '<style>*{{box-sizing:border-box}}body{{margin:0;background:#FAF2E3;font-family:Arial,sans-serif}}'
+            + '.hdr{{background:#002E4F;color:#fff;padding:10px 16px}}.hdr h3{{margin:0;font-size:16px;font-weight:700}}'
+            + '.ctrl{{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid #ddd}}'
+            + '.ctrl label{{font-size:12px;font-weight:600;color:#002E4F;white-space:nowrap}}'
+            + '.ctrl select{{flex:1;padding:4px 6px;font-size:13px;border:1px solid rgba(0,46,79,.35);border-radius:3px;background:#F6F6F6;color:#002E4F}}'
+            + '.fn{{font-size:11px;color:#777;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}'
+            + '.img-wrap{{padding:12px 16px}}.img-wrap img{{width:100%;height:auto;border-radius:3px}}'
+            + '</style></head><body>'
+            + '<div class="hdr"><h3>' + naam + '</h3></div>';
+        if (hasGraphs) {{
+            html += '<div class="ctrl"><label>Modellaag:</label>'
+                + '<select id="S" onchange="upd()">' + opts + '</select>'
+                + '<span id="F" class="fn"></span></div>'
+                + '<div class="img-wrap"><img id="I"></div>'
+                + '<' + 'script>var D=' + dataJson + ';'
+                + 'function upd(){{var s=document.getElementById("S"),k=s.value,p=k.split("|");'
+                + 'document.getElementById("I").src="data:image/png;base64,"+D[k];'
+                + 'document.getElementById("F").textContent=p[1]||"";}}upd();'
+                + '<' + '/script>';
+        }} else {{
+            html += '<div style="padding:30px;text-align:center;color:#888;font-size:14px;">Geen grafiek beschikbaar.</div>';
+        }}
+        var _win = window.open('about:blank', '_blank', 'width=900,height=700,resizable=yes,scrollbars=yes');
+        if (_win) {{ _win.document.write(html); _win.document.close(); }}
+    }}
+    </script>
+    '''
+
 
 #==========================
 # Zijpanelen voor grafieken, hier kunnen de wensen daarvan makkelijk aan worden gepast
@@ -1199,6 +1282,14 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
     var colorLayer = null;              // Dynamische gekleurde bollenkaart per modellaag
     var highlightColorsByCardId = {{}};   // Legenda-kleur per cardId voor hover-herstel
     
+    // Pakketgroepen: persistent via localStorage, in-memory fallback
+    var _GROUPS_KEY = 'gw_raai_pakket_groups';
+    var _packetGroups = [];
+    var _activeGroupIdx = -1;
+    (function() {{
+        try {{ var _s = localStorage.getItem(_GROUPS_KEY); if (_s) _packetGroups = JSON.parse(_s); }} catch(e) {{}}
+    }})();
+    
     // Legenda kleurdata (identiek aan html_map_legend() in Python)
     var legendColorData = [
         [9999999.0, 10.0, 0, 0, 149],
@@ -1234,7 +1325,7 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
         return null;
     }}
     
-    function updateAllMarkerColors(modelLayer) {{
+    function updateAllMarkerColors(layers) {{
         if (!leafletMap) return;
         if (colorLayer) {{
             leafletMap.removeLayer(colorLayer);
@@ -1242,19 +1333,18 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
         }}
         colorLayer = L.layerGroup();
         getCurrentPoints().features.forEach(function(feature) {{
-            var ml = feature.properties.Modellaag;
-            if (ml === undefined || ml === null) return;
-            if (parseInt(ml) !== modelLayer) return;
             var coords = feature.geometry.coordinates;
             var diff = feature.properties.Difference;
-            var color = getLegendColor(diff);
-            if (!color) return;
+            var ml = feature.properties.Modellaag;
+            // punten buiten de laagkeuze blijven klikbaar maar worden kleiner/doorzichtiger weergegeven
+            var inLayer = (ml === undefined || ml === null) || layers.indexOf(parseInt(ml)) !== -1;
+            var color = inLayer ? (getLegendColor(diff) || '#888888') : '#888888';
             var marker = L.circleMarker([coords[1], coords[0]], {{
-                radius: 7,
+                radius: inLayer ? 7 : 5,
                 color: '#333333',
                 weight: 1,
                 fillColor: color,
-                fillOpacity: 0.9
+                fillOpacity: inLayer ? 0.9 : 0.4
             }});
             var popupLines = [];
             ['Naam', 'X', 'Y', 'Difference', 'Measured', 'Calc'].forEach(function(col) {{
@@ -1272,21 +1362,141 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
                 }}
             }});
             marker.bindPopup(popupLines.join('<br>'), {{maxWidth: 250}});
+            (function(n) {{
+                marker.on('click', function() {{ openGraphWindowForPeilbuis(n); }});
+            }})(feature.properties.Naam || feature.properties.naam || '');
             colorLayer.addLayer(marker);
         }});
         colorLayer.addTo(leafletMap);
     }}
     
     // ==========================
-    // filter functie op modellaag
+    // filter functie op modellagen
     // ==========================
     
-    function filterPointsByLayer(points, modelLayer) {{
+    function getSelectedLayers() {{
+        var checked = document.querySelectorAll('.layer-checkbox:checked');
+        var layers = [];
+        checked.forEach(function(cb) {{ layers.push(parseInt(cb.value)); }});
+        return layers;
+    }}
+    
+    function selectAllLayers() {{
+        _activeGroupIdx = -1;
+        document.querySelectorAll('.layer-checkbox').forEach(function(cb) {{ cb.checked = true; }});
+        renderGroupButtons();
+        _onLayerSelectionChange();
+    }}
+    
+    function deselectAllLayers() {{
+        _activeGroupIdx = -1;
+        document.querySelectorAll('.layer-checkbox').forEach(function(cb) {{ cb.checked = false; }});
+        renderGroupButtons();
+        _onLayerSelectionChange();
+    }}
+    
+    function selectLayerRange() {{
+        var from = parseInt(document.getElementById('range-from').value);
+        var to   = parseInt(document.getElementById('range-to').value);
+        if (isNaN(from) || isNaN(to)) {{ showStatus('Voer een geldig bereik in (bijv. van 1 t/m 9).', 'warning'); return; }}
+        if (from > to) {{ var _tmp = from; from = to; to = _tmp; }}
+        _activeGroupIdx = -1;
+        document.querySelectorAll('.layer-checkbox').forEach(function(cb) {{
+            var val = parseInt(cb.value);
+            cb.checked = val >= from && val <= to;
+        }});
+        renderGroupButtons();
+        _onLayerSelectionChange();
+    }}
+    
+    function filterPointsByLayers(points, layers) {{
         return points.filter(function(feature) {{
             var ml = feature.properties.Modellaag;
             if (ml === undefined || ml === null) return true;
-            return parseInt(ml) === modelLayer;
+            return layers.indexOf(parseInt(ml)) !== -1;
         }});
+    }}
+    
+    // ==========================
+    // Pakketgroepen
+    // ==========================
+    
+    function parseLayerSpec(spec) {{
+        var result = [];
+        spec.split(',').forEach(function(part) {{
+            part = part.trim();
+            var m = part.match(/^(\\d+)-(\\d+)$/);
+            if (m) {{
+                for (var i = parseInt(m[1]); i <= parseInt(m[2]); i++) result.push(i);
+            }} else {{
+                var n = parseInt(part);
+                if (!isNaN(n)) result.push(n);
+            }}
+        }});
+        return result;
+    }}
+    
+    function _saveGroups() {{
+        try {{ localStorage.setItem(_GROUPS_KEY, JSON.stringify(_packetGroups)); }} catch(e) {{}}
+    }}
+    
+    function renderGroupButtons() {{
+        var container = document.getElementById('packet-groups-container');
+        if (!container) return;
+        if (_packetGroups.length === 0) {{
+            container.innerHTML = '<div style="font-size:11px;color:#aaa;font-style:italic;">Nog geen groepen.</div>';
+            return;
+        }}
+        var primaryColor = '{HASKONING_COLORS["primary"]}';
+        var html = '';
+        _packetGroups.forEach(function(group, idx) {{
+            var isActive = idx === _activeGroupIdx;
+            var bg = isActive ? primaryColor : 'white';
+            var fg = isActive ? 'white' : primaryColor;
+            html += '<span style="display:inline-flex;align-items:center;margin:1px 2px 2px 0;">'
+                + '<button onclick="selectPacketGroup(' + idx + ')" title="Lagen: ' + group.spec + '" style="'
+                + 'font-size:11px;padding:3px 6px;background:' + bg + ';color:' + fg + ';'
+                + 'border:1px solid ' + primaryColor + ';border-radius:3px 0 0 3px;cursor:pointer;font-weight:600;line-height:1.3;">'
+                + group.name + '</button>'
+                + '<button onclick="removePacketGroup(' + idx + ')" style="'
+                + 'font-size:10px;padding:3px 4px;background:white;color:#999;'
+                + 'border:1px solid #ccc;border-left:none;border-radius:0 3px 3px 0;cursor:pointer;line-height:1.3;"'
+                + ' title="Verwijder groep">\u2715</button>'
+                + '</span>';
+        }});
+        container.innerHTML = html;
+    }}
+    
+    function addPacketGroup() {{
+        var nameInput = document.getElementById('group-name-input');
+        var name = nameInput ? nameInput.value.trim() : '';
+        if (!name) {{ showStatus('Vul een naam in voor de pakketgroep.', 'warning'); return; }}
+        var layers = getSelectedLayers();
+        if (layers.length === 0) {{ showStatus('Vink eerst de gewenste lagen aan, geef dan een naam en klik Sla op.', 'warning'); return; }}
+        _packetGroups.push({{ name: name, spec: layers.join(', '), layers: layers }});
+        _saveGroups();
+        if (nameInput) nameInput.value = '';
+        showStatus('Groep "' + name + '" opgeslagen (' + layers.length + ' lagen).', 'success');
+        renderGroupButtons();
+    }}
+    
+    function removePacketGroup(idx) {{
+        _packetGroups.splice(idx, 1);
+        _saveGroups();
+        if (_activeGroupIdx === idx) _activeGroupIdx = -1;
+        else if (_activeGroupIdx > idx) _activeGroupIdx--;
+        renderGroupButtons();
+    }}
+    
+    function selectPacketGroup(idx) {{
+        if (!_packetGroups[idx]) return;
+        _activeGroupIdx = idx;
+        var groupLayers = _packetGroups[idx].layers;
+        document.querySelectorAll('.layer-checkbox').forEach(function(cb) {{
+            cb.checked = groupLayers.indexOf(parseInt(cb.value)) !== -1;
+        }});
+        _onLayerSelectionChange();
+        renderGroupButtons();
     }}
     
     // ==========================
@@ -1296,9 +1506,7 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
     function switchDataType(type) {{
         currentDataType = type;
         updateDataTypeBtns(type);
-        var sel = document.getElementById('model-layer-select');
-        var modelLayer = sel ? parseInt(sel.value) : 1;
-        updateAllMarkerColors(modelLayer);
+        updateAllMarkerColors(getSelectedLayers());
         // Reset zoekresultaten: gebruiker moet opnieuw op "Zoek Punten" klikken
         lastPointsInBuffer = null;
         clearHighlights();
@@ -1319,17 +1527,19 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
         }});
     }}
     
-    // Werk de dropdown bij: toon checkmark bij lagen die grafieken hebben voor gevonden punten
+    // Werk checkbox-labels bij: toon checkmark bij lagen die grafieken hebben voor gevonden punten
     function updateLayerDropdown(pointsInBuffer) {{
-        var select = document.getElementById('model-layer-select');
-        if (!select) return;
-        Array.from(select.options).forEach(function(option) {{
-            var layerVal = parseInt(option.value);
+        document.querySelectorAll('.layer-checkbox').forEach(function(cb) {{
+            var layerVal = parseInt(cb.value);
+            var label = document.getElementById('layer-label-' + layerVal);
+            if (!label) return;
+            var span = label.querySelector('span');
+            if (!span) return;
             if (!pointsInBuffer || pointsInBuffer.length === 0) {{
-                option.text = String(layerVal);
+                span.textContent = String(layerVal);
                 return;
             }}
-            var layerPoints = filterPointsByLayer(pointsInBuffer, layerVal);
+            var layerPoints = filterPointsByLayers(pointsInBuffer, [layerVal]);
             var layerImages = allImages[layerVal] || {{}};
             var hasGraphs = layerPoints.some(function(point) {{
                 var naam = point.properties.Naam || point.properties.naam || '';
@@ -1337,7 +1547,7 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
                     return filename === naam || filename.indexOf(naam + '_') === 0;
                 }});
             }});
-            option.text = hasGraphs ? '\u2713 ' + layerVal : String(layerVal);
+            span.textContent = hasGraphs ? '\u2713 ' + layerVal : String(layerVal);
         }});
     }}
     
@@ -1401,17 +1611,15 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
                 showStatus('Lijn bewerkt! Klik op "Zoek Punten" om opnieuw te zoeken.', 'info');
             }});
             
-            // Kleuren markers bij initialisatie op basis van geselecteerde modellaag
+            // Kleuren markers bij initialisatie op basis van geselecteerde modellagen
             setTimeout(function() {{
-                var sel = document.getElementById('model-layer-select');
-                if (sel) updateAllMarkerColors(parseInt(sel.value));
+                updateAllMarkerColors(getSelectedLayers());
             }}, 300);
             
             // Koppel colorLayer en highlights aan Peilbuizen laag-toggle
             leafletMap.on('overlayadd', function(e) {{
                 if (e.name === 'Peilbuizen') {{
-                    var sel = document.getElementById('model-layer-select');
-                    if (sel) updateAllMarkerColors(parseInt(sel.value));
+                    updateAllMarkerColors(getSelectedLayers());
                 }}
             }});
             leafletMap.on('overlayremove', function(e) {{
@@ -1432,23 +1640,37 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
         }}
     }})();
     
-    // Registreer auto-update bij modellaag wissel
+    // Registreer auto-update bij modellaag wissel via event delegation op de checkboxlijst
+    function _onLayerSelectionChange() {{
+        var layers = getSelectedLayers();
+        updateAllMarkerColors(layers);
+        if (lastPointsInBuffer && lastPointsInBuffer.length > 0) {{
+            var filtered = filterPointsByLayers(lastPointsInBuffer, layers);
+            if (filtered.length > 0) {{
+                highlightPoints(filtered);
+                displayGraphs(filtered, layers);
+            }} else {{
+                clearHighlights();
+                closePanels();
+            }}
+        }}
+    }}
+    
     (function initLayerChangeListener() {{
         function tryRegister() {{
-            var layerSelect = document.getElementById('model-layer-select');
-            if (!layerSelect) {{
+            var list = document.getElementById('layer-checkbox-list');
+            if (!list) {{
                 setTimeout(tryRegister, 100);
                 return;
             }}
-            layerSelect.addEventListener('change', function() {{
-                var modelLayer = parseInt(this.value);
-                updateAllMarkerColors(modelLayer);
-                if (lastPointsInBuffer && lastPointsInBuffer.length > 0) {{
-                    var filtered = filterPointsByLayer(lastPointsInBuffer, modelLayer);
-                    highlightPoints(filtered);
-                    displayGraphs(filtered, modelLayer);
+            list.addEventListener('change', function(e) {{
+                if (e.target && e.target.classList.contains('layer-checkbox')) {{
+                    _activeGroupIdx = -1;
+                    renderGroupButtons();
+                    _onLayerSelectionChange();
                 }}
             }});
+            renderGroupButtons();
         }}
         if (document.readyState === 'loading') {{
             document.addEventListener('DOMContentLoaded', tryRegister);
@@ -1509,12 +1731,13 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
             }});
             marker.bindPopup(popupLines.join('<br>'), {{maxWidth: 250}});
             
-            // Klik: toon popup + highlight punt geel/rood + scroll naar grafiek
+            // Klik: toon popup + highlight punt + scroll naar grafiek + nieuw venster
             (function(n, cid) {{
                 marker.on('click', function() {{
                     marker.openPopup();
                     showHoverHighlight(cid);
                     scrollToGraph(n);
+                    openGraphWindowForPeilbuis(n);
                 }});
             }})(naam, cardId);
             
@@ -1575,7 +1798,11 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
             return;
         }}
         
-        var modelLayer = parseInt(document.getElementById('model-layer-select').value);
+        var selectedLayers = getSelectedLayers();
+        if (selectedLayers.length === 0) {{
+            showStatus('Selecteer minstens 1 modellaag.', 'error');
+            return;
+        }}
         
         // Maak een Turf.js lijn
         var line = turf.lineString(lineCoords);
@@ -1611,23 +1838,27 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
         // Bewaar ongefilterd resultaat voor auto-refresh bij modellaag wissel
         lastPointsInBuffer = pointsInBuffer;
         
-        // Werk dropdown bij met indicatie welke lagen grafieken hebben
+        // Werk checkbox-labels bij met indicatie welke lagen grafieken hebben
         updateLayerDropdown(pointsInBuffer);
         
-        // Filter op geselecteerde modellaag via Modellaag-kolom
+        // Filter op geselecteerde lagen via Modellaag-kolom
+        var displayPoints = filterPointsByLayers(pointsInBuffer, selectedLayers);
         
-        // Filter op geselecteerde modellaag via Modellaag-kolom
-        var displayPoints = filterPointsByLayer(pointsInBuffer, modelLayer);
+        // Bepaal unieke peilbuizen na filtering
+        var uniqueNames = {{}};
+        displayPoints.forEach(function(p) {{ uniqueNames[p.properties.Naam || p.properties.naam || ''] = true; }});
+        var uniqueCount = Object.keys(uniqueNames).length;
         
-        if (displayPoints.length === 0) {{
-            showStatus('Geen peilbuizen gevonden binnen de bufferzone voor modellaag ' + modelLayer + '.', 'warning');
+        if (uniqueCount === 0) {{
+            var _layerStr = selectedLayers.length === 1 ? 'modellaag ' + selectedLayers[0] : 'de geselecteerde lagen';
+            showStatus('Geen peilbuizen gevonden binnen de bufferzone voor ' + _layerStr + '.', 'warning');
             clearHighlights();
             closePanels();
             return;
         }}
         
-        if (displayPoints.length > 12) {{
-            showStatus('Te veel peilbuizen gevonden (' + displayPoints.length + '). Verklein de bufferzone of teken een kortere raai. Max = 12.', 'error');
+        if (uniqueCount > 24) {{
+            showStatus('Te veel peilbuizen gevonden (' + uniqueCount + ' uniek). Verklein de bufferzone of teken een kortere raai. Max = 24.', 'error');
             clearHighlights();
             closePanels();
             return;
@@ -1636,9 +1867,10 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
         // Highlight de gevonden punten
         highlightPoints(displayPoints);
         
-        showStatus('Gevonden: ' + displayPoints.length + ' peilbuizen voor laag ' + modelLayer + '. Grafieken worden geladen...', 'success');
+        var _layerStr = selectedLayers.length === 1 ? 'laag ' + selectedLayers[0] : selectedLayers.length + ' lagen';
+        showStatus('Gevonden: ' + uniqueCount + ' unieke peilbuizen voor ' + _layerStr + '. Grafieken worden geladen...', 'success');
         
-        displayGraphs(displayPoints, modelLayer);
+        displayGraphs(displayPoints, selectedLayers);
     }}
     
     function showBufferOnMap(bufferedPolygon) {{
@@ -1693,7 +1925,7 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
     // Weergave van grafieken in zijpanelen
     // ==========================
     
-    function displayGraphs(points, modelLayer) {{
+    function displayGraphs(points, selectedLayers) {{
         var leftGraphs = document.getElementById('left-graphs');
         var rightGraphs = document.getElementById('right-graphs');
         var leftPanel = document.getElementById('left-panel');
@@ -1703,20 +1935,31 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
         leftGraphs.innerHTML = '';
         rightGraphs.innerHTML = '';
         
-        var layerImages = allImages[modelLayer] || {{}};
+        // Dedupliceer op Naam, bewaar kleinste afstand
+        var uniqueMap = {{}};
+        points.forEach(function(point) {{
+            var naam = point.properties.Naam || point.properties.naam || 'Onbekend';
+            var dist = point.properties._distanceAlongLine || 0;
+            if (!uniqueMap[naam] || dist < uniqueMap[naam].properties._distanceAlongLine) {{
+                uniqueMap[naam] = point;
+            }}
+        }});
+        var uniquePoints = Object.values(uniqueMap).sort(function(a, b) {{
+            return (a.properties._distanceAlongLine || 0) - (b.properties._distanceAlongLine || 0);
+        }});
         
         // Verdeel punten: eerste helft links, tweede helft rechts
-        var half = Math.ceil(points.length / 2);
-        var leftPoints = points.slice(0, half);
-        var rightPoints = points.slice(half);
+        var half = Math.ceil(uniquePoints.length / 2);
+        var leftPoints = uniquePoints.slice(0, half);
+        var rightPoints = uniquePoints.slice(half);
         
         leftPoints.forEach(function(point) {{
-            var graphHtml = createGraphElement(point, layerImages, modelLayer);
+            var graphHtml = createGraphElement(point, selectedLayers);
             leftGraphs.innerHTML += graphHtml;
         }});
         
         rightPoints.forEach(function(point) {{
-            var graphHtml = createGraphElement(point, layerImages, modelLayer);
+            var graphHtml = createGraphElement(point, selectedLayers);
             rightGraphs.innerHTML += graphHtml;
         }});
         
@@ -1729,78 +1972,84 @@ def _get_main_javascript(points_stat_json: str, points_ghg_json: str, points_glg
         adjustMapMargins(true);
     }}
     
-    function createGraphElement(point, layerImages, modelLayer) {{
+    function createGraphElement(point, selectedLayers) {{
         var props = point.properties;
         var naam = props.Naam || props.naam || 'Onbekend';
         var distance = props._distanceAlongLine || 0;
         var distanceStr = distance.toFixed(0) + ' m';
-
         var cardId = 'graph-card-' + naam.replace(/[^a-zA-Z0-9]/g, '_');
+        var showLayerHeader = selectedLayers.length > 1;
 
-    // Zoek alle grafieken waarvan de bestandsnaam bij deze peilbuis hoort.
-    // Geen gedoe met filternummers: de bestandsnaam wordt exact getoond zoals die in layerImages staat.
-    var matchedImages = Object.keys(layerImages)
-        .filter(function(filename) {{
-            return filename === naam || filename.indexOf(naam + '_') === 0;
-        }})
-        .sort()
-        .map(function(filename) {{
-            return {{
-                filename: filename,
-                imageData: layerImages[filename]
-            }};
-        }});
+    // Verzamel overeenkomende grafieken per geselecteerde laag
+    var layerMatches = [];
+    selectedLayers.forEach(function(layer) {{
+        var layerImages = allImages[layer] || {{}};
+        var matches = Object.keys(layerImages)
+            .filter(function(filename) {{
+                return filename === naam || filename.indexOf(naam + '_') === 0;
+            }})
+            .sort()
+            .map(function(filename) {{
+                return {{ filename: filename, imageData: layerImages[filename] }};
+            }});
+        if (matches.length > 0) {{
+            layerMatches.push({{ layer: layer, matches: matches }});
+        }}
+    }});
 
     var html = '';
 
-    if (matchedImages.length === 0) {{
-        html += '<div id="' + cardId + '" data-card-id="' + cardId + '" '
+    if (layerMatches.length === 0) {{
+        html += '<div id="' + cardId + '" data-card-id="' + cardId + '" data-naam="' + naam + '" '
             + 'onmouseenter="showHoverHighlight(this.dataset.cardId)" '
             + 'onmouseleave="hideHoverHighlight()" '
+            + 'onclick="openGraphWindowForPeilbuis(this.dataset.naam)" '
             + 'style="margin-bottom: 15px; background: white; border: 1px solid #ddd; border-radius: 4px; padding: 8px; cursor: pointer;">';
-
         html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">';
         html += '<span style="font-weight: 600; font-size: 12px; color: #333;">' + naam + '</span>';
         html += '<span style="font-size: 12px; color: #0066cc; background: #e6f2ff; padding: 2px 6px; border-radius: 3px;">📍 ' + distanceStr + '</span>';
         html += '</div>';
-
         html += '<div style="padding: 20px; background: #f0f0f0; text-align: center; color: #666; font-size: 11px; border-radius: 3px;">';
-        html += 'Geen grafiek beschikbaar<br>voor laag ' + modelLayer;
+        html += 'Geen grafiek beschikbaar voor geselecteerde lagen';
         html += '</div>';
-
         html += '</div>';
-
         return html;
     }}
 
-    matchedImages.forEach(function(match, idx) {{
-        var subCardId = idx === 0 ? cardId : cardId + '_' + idx;
+    // Omhullende kaart met peilbuis-naam en afstand
+    html += '<div id="' + cardId + '" data-card-id="' + cardId + '" data-naam="' + naam + '" '
+        + 'onmouseenter="showHoverHighlight(this.dataset.cardId)" '
+        + 'onmouseleave="hideHoverHighlight()" '
+        + 'onclick="openGraphWindowForPeilbuis(this.dataset.naam)" '
+        + 'style="margin-bottom: 15px; background: white; border: 1px solid #ddd; border-radius: 4px; padding: 8px; cursor: pointer;">';
+    html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
+    html += '<span style="font-weight: 700; font-size: 13px; color: #002E4F;">' + naam + '</span>';
+    html += '<span style="font-size: 12px; color: #0066cc; background: #e6f2ff; padding: 2px 6px; border-radius: 3px;">📍 ' + distanceStr + '</span>';
+    html += '</div>';
 
-        html += '<div id="' + subCardId + '" data-card-id="' + cardId + '" '
-            + 'onmouseenter="showHoverHighlight(this.dataset.cardId)" '
-            + 'onmouseleave="hideHoverHighlight()" '
-            + 'style="margin-bottom: 15px; background: white; border: 1px solid #ddd; border-radius: 4px; padding: 8px; cursor: pointer;">';
-
-        html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">';
-
-        // Hier wordt gewoon de bestandsnaam/key getoond.
-        html += '<span style="font-weight: 600; font-size: 12px; color: #333;">' + match.filename + '</span>';
-
-        html += '<span style="font-size: 12px; color: #0066cc; background: #e6f2ff; padding: 2px 6px; border-radius: 3px;">📍 ' + distanceStr + '</span>';
-        html += '</div>';
-
-        html += '<img src="data:image/png;base64,' + match.imageData + '" style="width: 100%; height: auto; border-radius: 3px;">';
-
-        if (props.Difference !== undefined) {{
-            var diff = parseFloat(props.Difference);
-            if (!isNaN(diff)) {{
-                html += '<div style="font-size: 12px; color: #666; margin-top: 4px;">Verschil: ' + diff.toFixed(2) + ' m</div>';
-            }}
+    layerMatches.forEach(function(layerGroup) {{
+        if (showLayerHeader) {{
+            html += '<div style="font-size: 11px; font-weight: 600; color: #fff; background: #002E4F; '
+                + 'padding: 2px 6px; border-radius: 3px; margin: 6px 0 4px;">Laag ' + layerGroup.layer + '</div>';
         }}
-
-        html += '</div>';
+        layerGroup.matches.forEach(function(match) {{
+            html += '<div style="margin-bottom: 6px;">';
+            if (showLayerHeader || layerGroup.matches.length > 1) {{
+                html += '<div style="font-size: 11px; color: #555; margin-bottom: 2px;">' + match.filename + '</div>';
+            }}
+            html += '<img src="data:image/png;base64,' + match.imageData + '" style="width: 100%; height: auto; border-radius: 3px;">';
+            html += '</div>';
+        }});
     }});
 
+    if (props.Difference !== undefined) {{
+        var diff = parseFloat(props.Difference);
+        if (!isNaN(diff)) {{
+            html += '<div style="font-size: 12px; color: #666; margin-top: 4px; border-top: 1px solid #eee; padding-top: 4px;">Verschil: ' + diff.toFixed(2) + ' m</div>';
+        }}
+    }}
+
+    html += '</div>';
     return html;
     }}
   
@@ -2083,7 +2332,7 @@ def create_raai_selection_map(
             gdf,
             name,
             style={"color": color, "weight": weight, "fillOpacity": 0.1},
-            tooltip_fields=_pick_tooltip_fields(gdf),
+            popup_fields=_pick_tooltip_fields(gdf),
         ).add_to(fmap)
 
     # Voeg peilbuispunten toe (op basis van eerste beschikbare dataset)
@@ -2153,6 +2402,7 @@ def create_raai_selection_map(
     html_elements.append(_get_topbar_offset_css())
     html_elements.append(_get_control_panel_html(available_layers, available_types, _first_active_type))
     html_elements.append(_get_side_panels_html())
+    html_elements.append(_get_floating_popup_html())
     html_elements.append(_get_legend_html())  # Legenda toggle
     html_elements.append(_get_main_javascript(points_stat_json, points_ghg_json, points_glg_json, images_json, _first_active_type))
     html_elements.append(_get_ui_tweaks_html())
